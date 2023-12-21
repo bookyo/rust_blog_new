@@ -10,7 +10,7 @@ use actix_cors::Cors;
 use actix_files as fs;
 use actix_web::{http, middleware::Logger, web, App, HttpServer};
 use controllers::{
-    blog::{create, get_blog, get_blogs, upload, update},
+    blog::{create, get_blog, get_blogs, upload, update, notify},
     user::{hello, login, register},
 };
 use database::{create_blog_index, create_init_user};
@@ -53,6 +53,7 @@ async fn main() -> std::io::Result<()> {
             .route("/blog", web::get().to(get_blog))
             .route("/blogs", web::get().to(get_blogs))
             .route("/upload", web::post().to(upload))
+            .route("/notify", web::post().to(notify))
     })
     .bind(("127.0.0.1", 8080))?
     .run()

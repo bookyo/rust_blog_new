@@ -14,6 +14,7 @@ use mongodb::{
     Client,
 };
 use uuid::Uuid;
+use validator::Validate;
 
 use crate::{
     database::get_blog_collection,
@@ -24,6 +25,84 @@ use crate::{
     },
 };
 use serde::{self, Deserialize, Serialize};
+
+
+#[derive(Debug, Deserialize, Serialize, Validate)]
+pub struct NotifyKey {
+  pub key: String,
+}
+
+#[derive(Debug, Deserialize, Serialize, Validate)]
+pub struct Poster2 {
+    pub url: String,
+    pub width: u16,
+    pub height: u16,
+}
+
+#[derive(Debug, Deserialize, Serialize, Validate)]
+pub struct Notify {
+  pub _id: Option<ObjectId>,
+  pub originalname: String,
+  pub poster: String,
+  pub poster2: Poster2,
+  pub magnetUrl: String,
+  pub screenshots: Vec<String>,
+  pub previewvideo: Option<String>,
+  pub created_at: Option<DateTime>
+}
+
+#[derive(Debug, Deserialize, Serialize, Validate)]
+pub struct NotifyRes {
+    pub movie: Notify
+}
+
+pub async fn notify( client: web::Data<Client>,
+    query: web::Query<NotifyKey>,
+    notify: Json<NotifyRes>) -> HttpResponse {
+    if query.key != "givemyjobok" {
+        return HttpResponse::Unauthorized().json(ResponseMessage {
+            success: 0,
+            message: "对不起，认证失败！".to_string(),
+        });
+    }
+    let blog_db = get_blog_collection(client);
+    let mut html_content = String::new();
+    let host = env::var("EFV_HOST").unwrap();
+    for url in &notify.movie.screenshots {
+        html_content.push_str(&format!("<p><a href=\"{}{}\" target=\"_blank\">{}{}</a></p>", &host, url, &host, url));
+    }
+    let content = format!("<h3>预览视频</h3><p><a href=\"{}\" target=\"_blank\">预览视频</a></p> <h3>预览截图</h3> {}", host + &notify.movie.previewvideo.clone().unwrap_or("暂无预览视频".to_string()) ,html_content);
+    let new_blog = Blog {
+        created_at: Some(DateTime::now()),
+        _id: Some(ObjectId::new()),
+        title: notify.movie.originalname.clone(),
+        content,
+        resource: extract_btih_from_magnet(&notify.movie.magnetUrl),
+    };
+
+    let new_blog = blog_db.insert_one(new_blog, None).await;
+    match new_blog {
+        Ok(insert) => HttpResponse::Ok().json(PostResponse {
+            success: 1,
+            id: insert.inserted_id.as_object_id().unwrap().to_string(),
+        }),
+        Err(err) => HttpResponse::Ok().json(ResponseMessage {
+            success: 0,
+            message: err.to_string(),
+        }),
+    }
+}
+
+fn extract_btih_from_magnet(magnet_link: &str) -> Option<String> {
+    let parts: Vec<&str> = magnet_link.split('&').collect();
+    for part in parts {
+        if part.starts_with("magnet:?xt=urn:btih:") {
+            return part.strip_prefix("magnet:?xt=urn:btih:").map(|s| s.to_string());
+        }
+    }
+    None
+}
+
 
 #[derive(Deserialize, Serialize)]
 struct PostResponse {
