@@ -15,6 +15,8 @@ use mongodb::{
 };
 use uuid::Uuid;
 use validator::Validate;
+use reqwest;
+use pulldown_cmark::{Parser, html::push_html};
 
 use crate::{
     database::get_blog_collection,
@@ -56,6 +58,16 @@ pub struct NotifyRes {
     pub movie: Notify
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+struct RequestData {
+    text: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct ResponseData {
+    text: String,
+}
+
 pub async fn notify( client: web::Data<Client>,
     query: web::Query<NotifyKey>,
     notify: Json<NotifyRes>) -> HttpResponse {
@@ -65,13 +77,16 @@ pub async fn notify( client: web::Data<Client>,
             message: "对不起，认证失败！".to_string(),
         });
     }
+    let title = &notify.movie.originalname;
+    let ai_generate = post_text(title).await.unwrap_or(ResponseData { text: "暂无内容".to_string() }).text;
+    let content_tohtml = markdown_to_html(&ai_generate);
     let blog_db = get_blog_collection(client);
     let mut html_content = String::new();
     let host = env::var("EFV_HOST").unwrap();
     for url in &notify.movie.screenshots {
         html_content.push_str(&format!("<p><a href=\"{}{}\" target=\"_blank\">{}{}</a></p>", &host, url, &host, url));
     }
-    let content = format!("<h3>预览视频</h3><p><a href=\"{}\" target=\"_blank\">预览视频</a></p> <h3>预览截图</h3> {}", host + &notify.movie.previewvideo.clone().unwrap_or("暂无预览视频".to_string()) ,html_content);
+    let content = format!("{}<h3>预览视频</h3><p><a href=\"{}\" target=\"_blank\">预览视频</a></p> <h3>预览截图</h3> {}", &content_tohtml, host + &notify.movie.previewvideo.clone().unwrap_or("暂无预览视频".to_string()) ,html_content);
     let new_blog = Blog {
         created_at: Some(DateTime::now()),
         _id: Some(ObjectId::new()),
@@ -93,6 +108,13 @@ pub async fn notify( client: web::Data<Client>,
     }
 }
 
+fn markdown_to_html(markdown_input: &str) -> String {
+    let parser = Parser::new(markdown_input);
+    let mut html_output = String::new();
+    push_html(&mut html_output, parser);
+    html_output
+}
+
 fn extract_btih_from_magnet(magnet_link: &str) -> Option<String> {
     let parts: Vec<&str> = magnet_link.split('&').collect();
     for part in parts {
@@ -103,6 +125,23 @@ fn extract_btih_from_magnet(magnet_link: &str) -> Option<String> {
     None
 }
 
+async fn post_text(text: &str) -> Result<ResponseData, reqwest::Error> {
+    let client = reqwest::Client::new();
+    let url = env::var("AI_URL").unwrap();
+
+    let request_data = RequestData {
+        text: text.to_string(),
+    };
+
+    let response = client.post(url)
+        .json(&request_data)
+        .send()
+        .await?
+        .json::<ResponseData>()
+        .await?;
+
+    Ok(response)
+}
 
 #[derive(Deserialize, Serialize)]
 struct PostResponse {

@@ -6,6 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+reqwest = { version = "0.11", features = ["json"] }
 actix-web = "4"
 serde = { version = "1", features = ["derive"] }
 mongodb = "2"
@@ -24,6 +25,7 @@ uuid = { version = "1.1.2", features = ["serde", "v4"] }
 actix-form-data = "0.6.2"
 sanitize-filename = "0.4.0"
 actix-cors = "0.6.2"
+pulldown-cmark = "0.9"
 
 [dependencies.chrono]
 version = "0.4.22"
