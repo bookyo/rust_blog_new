@@ -71,7 +71,8 @@ struct ResponseData {
 pub async fn notify( client: web::Data<Client>,
     query: web::Query<NotifyKey>,
     notify: Json<NotifyRes>) -> HttpResponse {
-    if query.key != "givemyjobok" {
+    let notify_key = env::var("NOTIFY_KEY").unwrap();
+    if query.key != notify_key {
         return HttpResponse::Unauthorized().json(ResponseMessage {
             success: 0,
             message: "对不起，认证失败！".to_string(),
