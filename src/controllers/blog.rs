@@ -87,7 +87,12 @@ pub async fn notify( client: web::Data<Client>,
     for url in &notify.movie.screenshots {
         html_content.push_str(&format!("<p><a href=\"{}{}\" target=\"_blank\">{}{}</a></p>", &host, url, &host, url));
     }
-    let content = format!("{}<h3>预览视频</h3><p><a href=\"{}\" target=\"_blank\">预览视频</a></p> <h3>预览截图</h3> {}", &content_tohtml, host + &notify.movie.previewvideo.clone().unwrap_or("暂无预览视频".to_string()) ,html_content);
+    let preview_video_html = if let Some(preview_video) = &notify.movie.previewvideo {
+        format!("<p><a href=\"{}{}\" target=\"_blank\">预览视频</a></p>", host, preview_video)
+    } else {
+        "<p>暂无预览视频</p>".to_string()
+    };
+    let content = format!("{}<h3>预览视频</h3>{}<h3>预览截图</h3> {}", &content_tohtml, preview_video_html, html_content);
     let new_blog = Blog {
         created_at: Some(DateTime::now()),
         _id: Some(ObjectId::new()),
